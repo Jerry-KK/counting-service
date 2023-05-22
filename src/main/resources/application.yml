@@ -7,4 +7,25 @@ spring:
     username: root
     password: root
     virtual-host: count-server
+      ##开启发布确认  (三种模式)
+      #        SIMPLE, 同步确认,单次,批量确认 通过invoke调用
+      #            rabbitTemplate.invoke(operations -> {
+      #            rabbitTemplate.convertAndSend("", "hello3", msg, new CorrelationData(id));
+      #            return rabbitTemplate.waitForConfirms(5000);
+      #        });
+      #        CORRELATED,异步确认,消息附带CorrelationData
+      #        NONE;不开启
+    publisher-confirm-type: simple #消息发送到交换器确认
+    publisher-returns: true #表示接收mq返回的确认消息
+    # 开启手动确认
+    listener:
+      simple:
+        # none意味着没有任何的应答会被发送。manual意味着监听者必须通过调用Channel.basicAck()来告知所有的消息。auto意味着容器会自动应答，除非MessageListener抛出异常，这是默认配置方式。
+        acknowledge-mode: manual
+        # 该配置项是决定由于监听器抛出异常而拒绝的消息是否被重新放回队列。默认值为true。
+        default-requeue-rejected: true
+        # 开启重试次数和重试机制
+        retry:
+          max-attempts: 0
+          enabled: false
 

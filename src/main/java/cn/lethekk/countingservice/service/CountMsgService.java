@@ -4,11 +4,12 @@ import cn.lethekk.countingservice.entity.UserRequestMsg;
 import com.google.gson.Gson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 
 import static cn.lethekk.countingservice.constant.MqConstant.*;
@@ -24,18 +25,74 @@ public class CountMsgService {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public void countEvent(Long videoId, Integer eventTypeCode) {    //eventType: view like share
+    public void countEvent(Long videoId, Integer eventTypeCode)  {    //eventType: view like share
         UserRequestMsg msg = UserRequestMsg.builder()
                 .videoId(videoId)
                 .eventTypeCode(eventTypeCode)
                 .time(LocalDateTime.now())
                 .build();
-        String msgJson = new Gson().toJson(msg);
-        for (int i = 0; i < 10000; i++) {
-            rabbitTemplate.convertAndSend(requestExchange, routingKey, msgJson);
+        //sendPublishConfirm(msg);
+//        log.info(String.valueOf(rabbitTemplate.isChannelTransacted()));
+//        rabbitTemplate.setChannelTransacted(true);
+//        log.info(String.valueOf(rabbitTemplate.isChannelTransacted()));
+        for (int i = 0; i < 100; i++) {
+            sendAutoSerialization2(msg);
+            log.info("idx:" + i);
         }
+        sendAutoSerialization2(msg);
+        log.info("请求转发消息成功 : " + msg);
+    }
+
+    /**
+     * 手动序列化发送消息
+     * 默认只支持String,byte[] 这些基本类型序列化
+     */
+    public void sendManualSerialization(UserRequestMsg msg) {
+        String msgJson = new Gson().toJson(msg);
         rabbitTemplate.convertAndSend(requestExchange, routingKey, msgJson);
-        log.info("请求转发消息成功 : " + msgJson);
+    }
+
+    /**
+     * 通过配置RabbitMQ序列化，可以直接发送Object对象
+     */
+    public void sendAutoSerialization(UserRequestMsg msg) {
+        rabbitTemplate.convertAndSend(requestExchange, routingKey, msg);
+        boolean sendSuccess = rabbitTemplate.waitForConfirms(1000L);
+        log.info("消息发送结果为: " + sendSuccess);
+        if(!sendSuccess) {
+            throw new RuntimeException("消息发送失败或超时");
+        }
+    }
+
+    /**
+     * 发送消息，自动学序列化，同步确认
+     */
+    public void sendAutoSerialization2(UserRequestMsg msg) {
+        Boolean sendSuccess = rabbitTemplate.invoke(operations -> {
+            rabbitTemplate.convertAndSend(requestExchange, routingKey, msg);
+            return rabbitTemplate.waitForConfirms(1000L);
+        });
+        log.info("消息发送结果为: " + sendSuccess);
+        if(sendSuccess == null || !sendSuccess) {
+            throw new RuntimeException("消息发送失败或超时");
+        }
+    }
+
+    /**
+     * 事务性消息
+     */
+    @Transactional
+    public void sendTransaction(UserRequestMsg msg) {
+        rabbitTemplate.convertAndSend(requestExchange, routingKey, msg);
+        //int i = 1/0;
+    }
+
+    /**
+     * 发送方确认机制发送消息
+     */
+    public void sendPublishConfirm(UserRequestMsg msg) {
+        rabbitTemplate.convertAndSend(requestExchange, routingKey, msg, new CorrelationData());
+//        rabbitTemplate.convertAndSend(requestExchange + "1", routingKey, msg, new CorrelationData());
     }
 
     //测试消息成功发送
