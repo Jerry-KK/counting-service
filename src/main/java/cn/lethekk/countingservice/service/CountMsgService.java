@@ -35,7 +35,12 @@ public class CountMsgService {
 //        log.info(String.valueOf(rabbitTemplate.isChannelTransacted()));
 //        rabbitTemplate.setChannelTransacted(true);
 //        log.info(String.valueOf(rabbitTemplate.isChannelTransacted()));
-        for (int i = 0; i < 100; i++) {
+        // 将 Channel 对象设置到 RabbitTemplate
+        /**
+         * channel数量上限 在MQ服务器那边也要配， 和本地应用一起取更小的值
+         * rabbitTemplate.invoke每次创建一个channel 考虑如何复用
+         */
+        for (int i = 0; i < 2000; i++) {  //todo 1000000会报错 org.springframework.amqp.AmqpResourceNotAvailableException: The channelMax limit is reached. Try later.
             sendAutoSerialization2(msg);
             log.info("idx:" + i);
         }

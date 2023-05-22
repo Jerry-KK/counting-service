@@ -28,4 +28,7 @@ spring:
         retry:
           max-attempts: 0
           enabled: false
+    cache:
+      channel:
+        size: 2048
 
